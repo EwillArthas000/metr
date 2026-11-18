@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>METR — таксометр</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light dark;
+--bg:#eceef0;--card:#fff;--line:#dcdfe3;--tx:#15171a;--mut:#6a7078;--taxi:#ffc400;--ink:#16140f;--glass:#100d07;--amber:#ffb21f;
+--btn:#16140f;--btn-tx:#ffc400;--ok:#15a34a;--warn:#ea580c;--info:#2563eb}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1012;--card:#181b1f;--line:#2a2e34;--tx:#f1f2f4;--mut:#8b929b;--btn:#ffc400;--btn-tx:#16140f;--ok:#4ade80;--warn:#fb923c;--info:#60a5fa}}
+:root[data-theme="dark"]{--bg:#0e1012;--card:#181b1f;--line:#2a2e34;--tx:#f1f2f4;--mut:#8b929b;--btn:#ffc400;--btn-tx:#16140f;--ok:#4ade80;--warn:#fb923c;--info:#60a5fa}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:14px 14px 28px}
+main{max-width:520px;margin:0 auto;display:grid;gap:12px}
+header{display:flex;justify-content:space-between;align-items:center;padding:2px 2px 0}
+.logo{font-weight:900;font-size:20px;letter-spacing:.08em}
+.chip{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--mut);background:var(--card);border:1px solid var(--line);padding:6px 11px;border-radius:99px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
+.dot.moving,.dot.ok{background:var(--ok)}.dot.waiting,.dot.weak{background:var(--warn)}.dot.search{background:var(--info)}.dot.done{background:var(--taxi)}
+.hero{position:relative;overflow:hidden;background:var(--taxi);color:var(--ink);border-radius:26px;padding:16px 16px 36px}
+.hero:after{content:"";position:absolute;left:0;right:0;bottom:0;height:20px;background:conic-gradient(var(--ink) 25%,transparent 0 50%,var(--ink) 0 75%,transparent 0) 0 0/20px 20px}
+.htop{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-weight:700;font-size:14px}
+.st-chip{display:inline-flex;align-items:center;gap:7px;background:var(--ink);color:#f4f4f5;font-size:12px;font-weight:700;padding:6px 11px;border-radius:99px}
+.glass{background:var(--glass);border-radius:18px;padding:14px 18px 10px;display:flex;justify-content:space-between;align-items:flex-end;box-shadow:inset 0 3px 14px #000c,0 1px 0 #fff6}
+.glass small{color:#8a7a55;font-size:14px;font-weight:600;padding-bottom:12px}
+.fare{font-size:clamp(68px,22vw,104px);font-weight:800;letter-spacing:-.04em;line-height:1.05;color:var(--amber);font-variant-numeric:tabular-nums;text-shadow:0 0 26px #ffb21f66}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:14px}
+.stats b{display:block;font-size:18px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}.stats span{font-size:11px;font-weight:600;opacity:.7}
+.btns{display:grid;gap:9px}
+button{font:inherit;border:0;border-radius:18px;padding:17px;font-weight:800;font-size:16px;cursor:pointer;transition:transform .08s}
+button:active{transform:scale(.98)}
+.main{background:var(--btn);color:var(--btn-tx)}
+.alt{background:var(--card);color:var(--tx);border:1px solid var(--line)}
+.sm{padding:11px;font-size:14px;border-radius:14px}.two{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.link{background:none;color:var(--mut);padding:0;font-size:12px;font-weight:600;border-radius:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px}
+.card h2{margin:0 0 12px;font-size:15px;display:flex;justify-content:space-between;align-items:center}
+.route{position:relative;height:190px;border-radius:14px;background:var(--bg);overflow:hidden}
+.route canvas{width:100%;height:100%;display:block}
+.route p{position:absolute;inset:0;display:grid;place-items:center;margin:0;padding:0 24px;color:var(--mut);font-size:13px;text-align:center}
+.row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.row:last-child{border:0;padding-bottom:0}.row span{color:var(--mut)}.row b{white-space:nowrap;font-variant-numeric:tabular-nums}
+.mut{color:var(--mut);font-size:13px;margin-top:2px}
+.note{font-size:11px;color:var(--mut);line-height:1.6;margin:0;padding:0 4px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<header><div class="logo">METR</div><div class="chip"><span class="dot" id="gdot"></span><span id="gtxt">GPS выключен</span></div></header>
+
+<section class="card" id="restore" hidden>
+ <b>Найдена незавершённая поездка</b><div class="mut" id="rinfo"></div>
+ <div class="two"><button class="main sm" id="rYes">Продолжить</button><button class="alt sm" id="rNo">Удалить</button></div>
+</section>
+
+<section class="hero">
+ <div class="htop"><span>Стоимость поездки</span><span class="st-chip"><span class="dot" id="sdot"></span><span id="stxt">Готов</span></span></div>
+ <div class="glass"><small>сомони</small><div class="fare" id="fare">10</div></div>
+ <div class="stats">
+  <div><b id="dist">0,00</b><span>Километры</span></div>
+  <div><b id="spd">0</b><span>Км/ч</span></div>
+  <div><b id="wait">00:00</b><span>Ожидание</span></div>
+  <div><b id="dur">00:00</b><span>В пути</span></div>
+ </div>
+</section>
+
+<div class="btns">
+ <button class="main" id="go">Начать поездку</button>
+ <button class="alt" id="fin" hidden>Завершить поездку</button>
+</div>
+
+<section class="card">
+ <h2>Маршрут</h2>
+ <div class="route"><canvas id="cv"></canvas><p id="rph">Маршрут появится, когда начнётся движение</p></div>
+</section>
+
+<section class="card">
+ <h2>Расчёт тарифа</h2>
+ <div class="row"><span id="l1">Старт</span><b id="c1"></b></div>
+ <div class="row"><span id="l2">Расстояние</span><b id="c2">0</b></div>
+ <div class="row"><span id="l3">Ожидание</span><b id="c3">0</b></div>
+</section>
+
+<section class="card">
+ <h2>Последние поездки<button class="link" id="clr">Очистить</button></h2>
+ <div id="hist"></div>
+</section>
+
+<p class="note">Личный GPS-таксометр, не официальное приложение Jura Taxi. GPS может ошибаться между высотными зданиями и в туннелях. Держи страницу открытой: экран не погаснет, пока идёт поездка. Состояние поездки сохраняется на этом устройстве.</p>
+</main>
+
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+// Тариф (не менять без необходимости)
+const BASE=10,FIRST_KM=2.5,STEP_KM=.5,STEP_PRICE=1.5,WAIT_MIN=1,STOP_KMH=4,MAX_ACC=40;
+const KEY='metr_trip_v2',HKEY='metr_history_v2';
+const rd=(k,f)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??f}catch(e){return f}};
+const wr=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const fresh=()=>({phase:'idle',mode:'idle',runMs:0,waitMs:0,dist:0,speed:0,last:null,pts:[],acc:null,tickAt:0,fixAt:0});
+let S=fresh(),watch=null,timer=null,lock=null,saved=0,fc=0,hist=rd(HKEY,[]);
+
+const distFare=()=>S.dist<FIRST_KM?0:Math.floor((S.dist-FIRST_KM)/STEP_KM+1e-7)*STEP_PRICE;
+const waitFare=()=>Math.floor(S.waitMs/60000)*WAIT_MIN;
+const fare=()=>BASE+distFare()+waitFare();
+const money=n=>(Number.isInteger(n)?String(n):n.toFixed(1)).replace('.',',');
+const p2=n=>String(n).padStart(2,'0');
+const mmss=ms=>{const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60);return(h?h+':':'')+p2(m)+':'+p2(s%60)};
+const km2=n=>n.toFixed(2).replace('.',',');
+function hav(a,b){const r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dn=r(b.lon-a.lon);
+ const q=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dn/2)**2;return 12742*Math.asin(Math.sqrt(q))}
+
+function gps(k,txt){
+ const m={off:['','GPS выключен'],search:['search','Ищем GPS…'],ok:['ok','GPS ±'+Math.round(S.acc||0)+' м'],weak:['weak','Слабый сигнал'],lost:['weak','Нет сигнала'],err:['weak','Ошибка GPS']}[k];
+ $('gdot').className='dot '+m[0];$('gtxt').textContent=txt||m[1];
+}
+function addPt(p){const l=S.pts[S.pts.length-1];if(!l||hav({lat:l[0],lon:l[1]},p)>.005){S.pts.push([p.lat,p.lon]);if(S.pts.length>3000)S.pts.shift()}}
+
+function onPos(pos){
+ if(S.phase!=='run')return;
+ const c=pos.coords,t=pos.timestamp||Date.now(),p={lat:c.latitude,lon:c.longitude,t};
+ S.acc=c.accuracy;S.fixAt=Date.now();
+ if(c.accuracy>MAX_ACC){gps('weak');return}
+ gps('ok');
+ if(!S.last){S.last=p;S.mode='waiting';addPt(p);render();return}
+ const dt=(t-S.last.t)/1000;if(dt<=0)return;
+ const km=hav(S.last,p),calc=km/dt*3600;
+ if(dt>120||calc>160){S.last=p;return}          // разрыв или скачок GPS: пересчёт без километров
+ const hasV=c.speed!=null&&!isNaN(c.speed);
+ const moved=km*1000>Math.max(6,c.accuracy*.7);   // дрожание GPS на месте не считаем движением
+ const v=hasV?c.speed*3.6:(moved?calc:0);
+ S.speed=v;
+ if(v<STOP_KMH){S.mode='waiting';S.last={lat:S.last.lat,lon:S.last.lon,t}}
+ else{S.mode='moving';S.dist+=km;S.last=p;addPt(p)}
+ render();
+}
+function onErr(e){gps('err',{1:'Разреши доступ к геолокации',2:'Позиция не определена',3:'GPS не отвечает'}[e.code]||'Ошибка GPS')}
+
+function tick(){
+ const n=Date.now(),d=n-S.tickAt;S.tickAt=n;
+ if(S.phase==='run'){S.runMs+=d;if(S.mode==='waiting')S.waitMs+=d;if(S.fixAt&&n-S.fixAt>20000)gps('lost')}
+ render();if(n-saved>2000)save();
+}
+function save(){saved=Date.now();if(S.phase==='run'||S.phase==='pause')wr(KEY,{runMs:S.runMs,waitMs:S.waitMs,dist:S.dist,pts:S.pts.slice(-1500)})}
+
+async function lockOn(){try{if('wakeLock' in navigator&&!lock){const l=await navigator.wakeLock.request('screen');l.addEventListener('release',()=>{if(lock===l)lock=null});lock=l}}catch(e){}}
+function lockOff(){try{lock&&lock.release()}catch(e){}lock=null}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S.phase==='run')lockOn()});
+
+function begin(){
+ if(!navigator.geolocation){gps('err','Геолокация недоступна');return}
+ S.phase='run';S.mode='idle';S.last=null;S.fixAt=0;S.tickAt=Date.now();
+ watch=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+ timer=setInterval(tick,1000);gps('search');lockOn();ui();render();save();
+}
+function stop(){if(watch!==null)navigator.geolocation.clearWatch(watch);clearInterval(timer);watch=timer=null;lockOff()}
+function pause(){stop();S.phase='pause';S.mode='idle';S.speed=0;S.last=null;ui();render();save()}
+function finish(){
+ stop();S.phase='done';S.mode='idle';S.speed=0;
+ const t={d:new Date().toISOString(),km:+S.dist.toFixed(3),wait:S.waitMs,dur:S.runMs,fare:fare()};
+ if(t.km>0||t.dur>5000){hist.unshift(t);hist=hist.slice(0,30);wr(HKEY,hist)}
+ try{localStorage.removeItem(KEY)}catch(e){}
+ ui();render();drawHist();
+}
+function reset(){S=fresh();ui();render()}
+
+function ui(){
+ $('go').textContent={idle:'Начать поездку',run:'Пауза',pause:'Продолжить',done:'Новая поездка'}[S.phase];
+ $('fin').hidden=!(S.phase==='run'||S.phase==='pause');
+ if(S.phase!=='run')gps('off');
+}
+
+function render(){
+ $('fare').textContent=money(fare());
+ $('dist').textContent=km2(S.dist);
+ $('spd').textContent=Math.round(S.phase==='run'?S.speed:0);
+ $('wait').textContent=mmss(S.waitMs);$('dur').textContent=mmss(S.runMs);
+ $('c2').textContent=money(distFare())+' сом.';$('c3').textContent=money(waitFare())+' сом.';
+ const m=S.phase==='run'?(S.mode==='moving'?['moving','В пути']:S.mode==='waiting'?['waiting','Ожидание идёт']:['search','Ищем GPS…']):
+  S.phase==='pause'?['','Пауза']:S.phase==='done'?['done','Поездка завершена']:['','Готов к поездке'];
+ $('sdot').className='dot '+m[0];$('stxt').textContent=m[1];
+ drawRoute();
+}
+
+function drawRoute(){
+ const cv=$('cv'),w=cv.clientWidth,h=cv.clientHeight,dpr=window.devicePixelRatio||1;
+ if(!w||!h)return;
+ if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr)}
+ const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);
+ const P=S.pts;$('rph').hidden=P.length>1;if(P.length<2)return;
+ let a=1e9,b=-1e9,c=1e9,d=-1e9;
+ P.forEach(([la,lo])=>{a=Math.min(a,la);b=Math.max(b,la);c=Math.min(c,lo);d=Math.max(d,lo)});
+ const k=Math.cos((a+b)/2*Math.PI/180),sx=Math.max((d-c)*k,1e-5),sy=Math.max(b-a,1e-5),pad=20;
+ const sc=Math.min((w-2*pad)/sx,(h-2*pad)/sy),ox=(w-sx*sc)/2,oy=(h-sy*sc)/2;
+ const X=lo=>ox+(lo-c)*k*sc,Y=la=>h-oy-(la-a)*sc;
+ const cs=getComputedStyle(document.documentElement),taxi=cs.getPropertyValue('--taxi').trim(),tx=cs.getPropertyValue('--tx').trim();
+ g.lineJoin=g.lineCap='round';
+ const path=()=>{g.beginPath();P.forEach(([la,lo],i)=>i?g.lineTo(X(lo),Y(la)):g.moveTo(X(lo),Y(la)))};
+ g.lineWidth=9;g.strokeStyle=tx;g.globalAlpha=.85;path();g.stroke();
+ g.globalAlpha=1;g.lineWidth=5;g.strokeStyle=taxi;path();g.stroke();
+ const dotAt=(pt,col,r)=>{g.beginPath();g.arc(X(pt[1]),Y(pt[0]),r,0,7);g.fillStyle=col;g.fill();g.lineWidth=3;g.strokeStyle=tx;g.stroke()};
+ dotAt(P[0],tx,5);dotAt(P[P.length-1],taxi,7);
+}
+
+function drawHist(){
+ const el=$('hist');el.textContent='';
+ if(!hist.length){const r=document.createElement('div');r.className='row';const s=document.createElement('span');s.textContent='Пока нет завершённых поездок';r.append(s);el.append(r);return}
+ hist.slice(0,10).forEach(t=>{
+  const r=document.createElement('div');r.className='row';
+  const l=document.createElement('span');
+  l.textContent=new Date(t.d).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+', '+km2(t.km)+' км';
+  const b=document.createElement('b');b.textContent=money(t.fare)+' сом.';
+  r.append(l,b);el.append(r);
+ });
+}
+
+$('go').onclick=()=>({idle:begin,run:pause,pause:begin,done:reset})[S.phase]();
+$('fin').onclick=()=>{
+ if(fc){clearTimeout(fc);fc=0;$('fin').textContent='Завершить поездку';finish()}
+ else{$('fin').textContent='Нажми ещё раз, чтобы завершить';fc=setTimeout(()=>{fc=0;$('fin').textContent='Завершить поездку'},3000)}
+};
+$('clr').onclick=()=>{hist=[];wr(HKEY,hist);drawHist()};
+window.addEventListener('resize',render);
+
+$('l1').textContent='Старт, первые '+money(FIRST_KM)+' км включены';$('c1').textContent=money(BASE)+' сом.';
+$('l2').textContent='Дальше +'+money(STEP_PRICE)+' за каждые '+STEP_KM*1000+' м';
+$('l3').textContent='Ожидание +'+money(WAIT_MIN)+' за минуту';
+
+const sv=rd(KEY,null);
+if(sv&&(sv.dist>0||sv.runMs>5000)){
+ $('restore').hidden=false;$('rinfo').textContent=km2(sv.dist||0)+' км, в пути '+mmss(sv.runMs||0);
+ $('rYes').onclick=()=>{S.runMs=sv.runMs||0;S.waitMs=sv.waitMs||0;S.dist=sv.dist||0;S.pts=Array.isArray(sv.pts)?sv.pts:[];S.phase='pause';$('restore').hidden=true;ui();render()};
+ $('rNo').onclick=()=>{try{localStorage.removeItem(KEY)}catch(e){}$('restore').hidden=true};
+}
+ui();render();drawHist();
+})();
+</script>
+</body>
+</html>
